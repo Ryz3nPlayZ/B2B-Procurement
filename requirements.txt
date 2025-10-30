@@ -1,0 +1,10 @@
+# requirements.txt
+uagents
+hyperon
+google-generativeai
+httpx
+openai
+python-dotenv
+fastapi
+uvicorn
+jinja2

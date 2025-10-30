@@ -1,0 +1,2 @@
+# This file ensures the deal_files directory is tracked by git
+# Deal files (JSON memory per negotiation) will be stored here at runtime
