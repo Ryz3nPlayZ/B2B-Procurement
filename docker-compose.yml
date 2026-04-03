@@ -1,0 +1,14 @@
+version: '3.9'
+services:
+  procureos-api:
+    build: .
+    ports:
+      - "8090:8090"
+    environment:
+      - PROCUREOS_APP_NAME=ProcureOS API
+      - PROCUREOS_API_PREFIX=/v1
+      - PROCUREOS_SQLITE_PATH=/app/data/procureos.db
+      - PROCUREOS_CORS_ORIGINS=*
+      - PROCUREOS_RATE_LIMIT_PER_MINUTE=120
+    volumes:
+      - ./data:/app/data
