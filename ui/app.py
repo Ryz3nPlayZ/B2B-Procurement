@@ -26,6 +26,7 @@ app.mount("/static", StaticFiles(directory="ui/static"), name="static")
 
 engine = ProcurementEngine()
 event_stream: Deque[dict] = deque(maxlen=500)
+_event_count: int = 0  # total events ever appended (survives deque eviction)
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -68,6 +69,7 @@ async def metrics() -> dict:
 async def create_session(rfq: RFQRequest) -> dict:
     session = engine.create_session(rfq.model_dump())
 
+    global _event_count
     for milestone in session["milestones"]:
         event_stream.append(
             {
@@ -77,6 +79,7 @@ async def create_session(rfq: RFQRequest) -> dict:
                 "timestamp": milestone["at"],
             }
         )
+        _event_count += 1
 
     winner = session["winner"]
     event_stream.append(
@@ -87,6 +90,7 @@ async def create_session(rfq: RFQRequest) -> dict:
             "timestamp": session["created_at"],
         }
     )
+    _event_count += 1
     return session
 
 
@@ -106,14 +110,19 @@ async def get_session(session_id: str) -> dict:
 @app.websocket("/ws/events")
 async def ws_events(websocket: WebSocket) -> None:
     await websocket.accept()
-    cursor = 0
+    # Use the monotonic _event_count so the cursor is never capped by maxlen.
+    last_seen = _event_count
     try:
         while True:
-            events = list(event_stream)
-            if cursor < len(events):
-                for event in events[cursor:]:
+            total = _event_count
+            if total > last_seen:
+                new_count = total - last_seen
+                # Slice from the tail of the deque to get only unseen events.
+                snapshot = list(event_stream)
+                new_events = snapshot[-new_count:] if new_count < len(snapshot) else snapshot
+                for event in new_events:
                     await websocket.send_json(event)
-                cursor = len(events)
+                last_seen = total
             await asyncio.sleep(0.4)
     except WebSocketDisconnect:
         return

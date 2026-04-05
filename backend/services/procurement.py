@@ -113,7 +113,7 @@ def publish_rfq(org_id: str, rfq_id: str) -> None:
     exists = fetch_one("SELECT id, status FROM rfqs WHERE id = ? AND org_id = ?", (rfq_id, org_id))
     if not exists:
         raise HTTPException(status_code=404, detail="RFQ not found")
-    if exists["status"] not in {"draft", "published"}:
+    if exists["status"] != "draft":
         raise HTTPException(status_code=400, detail="Only draft RFQs can be published")
     execute("UPDATE rfqs SET status = 'published' WHERE id = ?", (rfq_id,))
 
@@ -122,8 +122,8 @@ def submit_bid(org_id: str, rfq_id: str, payload: BidCreate) -> dict:
     rfq = fetch_one("SELECT id, status FROM rfqs WHERE id = ? AND org_id = ?", (rfq_id, org_id))
     if not rfq:
         raise HTTPException(status_code=404, detail="RFQ not found")
-    if rfq["status"] not in {"published", "evaluated"}:
-        raise HTTPException(status_code=400, detail="RFQ must be published before bids")
+    if rfq["status"] != "published":
+        raise HTTPException(status_code=400, detail="RFQ must be published to accept bids")
 
     supplier = fetch_one("SELECT id FROM suppliers WHERE id = ? AND org_id = ?", (payload.supplier_id, org_id))
     if not supplier:
@@ -154,6 +154,8 @@ def evaluate_rfq(org_id: str, rfq_id: str) -> list[dict]:
     rfq = fetch_one("SELECT * FROM rfqs WHERE id = ? AND org_id = ?", (rfq_id, org_id))
     if not rfq:
         raise HTTPException(status_code=404, detail="RFQ not found")
+    if rfq["status"] != "published":
+        raise HTTPException(status_code=400, detail="Only published RFQs can be evaluated")
 
     bids = fetch_all(
         """
